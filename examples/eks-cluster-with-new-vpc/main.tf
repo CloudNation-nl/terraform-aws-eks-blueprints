@@ -1,3 +1,12 @@
+
+
+terraform {
+  backend "s3" {
+  }
+}
+
+data "aws_caller_identity" "current" {}
+
 provider "aws" {
   region = local.region
 }
@@ -26,7 +35,7 @@ locals {
   name = basename(path.cwd)
   # var.cluster_name is for Terratest
   cluster_name = coalesce(var.cluster_name, local.name)
-  region       = "us-west-2"
+  region       = "eu-west-1"
 
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -60,12 +69,36 @@ module "eks_blueprints" {
       subnet_ids      = module.vpc.private_subnets
     }
   }
+    map_roles = [
+        {
+          rolearn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.role_name}"
+          username = "admin"
+          groups   = ["system:masters"]
+        },
+        {
+          rolearn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eks-admin-role"
+          username = "admin"
+          groups   = ["system:masters"]
+        },
+        {
+          rolearn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/OrganizationFormationBuildAccessRole"
+          username = "admin"
+          groups   = ["system:masters"]
+        }
+
+
+      ]
+
 
   tags = local.tags
 }
 
 module "eks_blueprints_kubernetes_addons" {
   source = "../../modules/kubernetes-addons"
+
+  depends_on = [
+    module.eks_blueprints
+  ]
 
   eks_cluster_id       = module.eks_blueprints.eks_cluster_id
   eks_cluster_endpoint = module.eks_blueprints.eks_cluster_endpoint
@@ -149,4 +182,11 @@ module "vpc" {
   }
 
   tags = local.tags
+}
+
+resource "aws_ssm_parameter" "public_subnet_id" {
+  name = "/test"
+  value = module.vpc.public_subnets[0]
+  type = "String"
+  
 }

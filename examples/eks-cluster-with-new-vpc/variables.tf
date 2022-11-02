@@ -2,5 +2,10 @@
 variable "cluster_name" {
   description = "Name of cluster - used by Terratest for e2e test automation"
   type        = string
-  default     = ""
+  default     = "eksworkshop-eksctl"
+}
+
+variable "role_name" {
+  description = "Name of role to get access to cluster"
+  type        = string
 }
